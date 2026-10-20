@@ -1,59 +1,60 @@
 
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
-
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
-import type { Pool } from 'mysql2/promise';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 @Injectable()
-export class DatabaseService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(DatabaseService.name);
-  private pool!: Pool;
+export class DatabaseService
+  implements OnModuleInit, OnModuleDestroy
+{
+  private pool: mysql.Pool;
 
-  async onModuleInit(): Promise<void> {
+  constructor() {
+    const host = process.env.DB_HOST;
+    const user = process.env.DB_USER;
+    const password = process.env.DB_PASSWORD;
+    const database = process.env.DB_NAME;
+    const port = Number(process.env.DB_PORT || 3306);
+
+    if (!host || !user || !password || !database) {
+      throw new Error(
+        'Missing database environment variables. Check Render Environment settings.',
+      );
+    }
+
     this.pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 10580),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME || 'defaultdb',
-
+      host,
+      port,
+      user,
+      password,
+      database,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-
-      ssl: {
-        ca: fs.readFileSync(
-          path.join(process.cwd(), 'certs', 'ca.pem'),
-          'utf8',
-        ),
-        rejectUnauthorized: true,
-      },
+      connectTimeout: 15000,
+      ssl: process.env.DB_SSL_CA
+        ? {
+            ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n'),
+            rejectUnauthorized: true,
+          }
+        : { rejectUnauthorized: true },
     });
+  }
 
+  async onModuleInit() {
     try {
       await this.pool.query('SELECT 1');
-      this.logger.log('MySQL connected successfully');
+      console.log('Connected to MySQL database successfully.');
     } catch (error) {
-      await this.pool.end();
+      console.error('MySQL connection failed:', error);
       throw error;
     }
   }
 
-  getPool(): Pool {
-    return this.pool;
+  async onModuleDestroy() {
+    await this.pool.end();
   }
 
-  async onModuleDestroy(): Promise<void> {
-    if (this.pool) {
-      await this.pool.end();
-      this.logger.log('MySQL connection closed');
-    }
+  getPool(): mysql.Pool {
+    return this.pool;
   }
 }
