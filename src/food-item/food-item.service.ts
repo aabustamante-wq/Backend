@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
@@ -11,7 +16,10 @@ export class FoodItemService {
 
   // GET all food items
   async findAll() {
-    const [rows] = await this.pool.query('SELECT * FROM food_item');
+    const [rows]: any = await this.pool.query(
+      'SELECT * FROM FOOD_ITEM',
+    );
+
     return rows;
   }
 
@@ -22,12 +30,14 @@ export class FoodItemService {
   // GET food item by ID
   async findOne(id: number) {
     const [rows]: any = await this.pool.query(
-      'SELECT * FROM food_item WHERE food_id = ?',
+      'SELECT * FROM FOOD_ITEM WHERE food_id = ?',
       [id],
     );
 
     if (!rows || rows.length === 0) {
-      throw new NotFoundException(`Food item with ID ${id} not found`);
+      throw new NotFoundException(
+        `Food item with ID ${id} not found`,
+      );
     }
 
     return rows[0];
@@ -43,21 +53,30 @@ export class FoodItemService {
 
     try {
       const [result]: any = await this.pool.execute(
-        `INSERT INTO food_item (name, info, price, availability, restaurant_id)
+        `INSERT INTO FOOD_ITEM
+          (food_name, food_info, food_price, food_availability, restaurant_id)
          VALUES (?, ?, ?, ?, ?)`,
         [name, info, price, availability, restaurant_id],
       );
 
       return {
         food_id: result.insertId,
-        ...data,
+        name,
+        info,
+        price,
+        availability,
+        restaurant_id,
       };
     } catch (error: any) {
-      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+      if (
+        error.code === 'ER_NO_REFERENCED_ROW_2' ||
+        error.errno === 1452
+      ) {
         throw new BadRequestException(
           `Restaurant with ID ${restaurant_id} does not exist`,
         );
       }
+
       throw error;
     }
   }
@@ -68,23 +87,32 @@ export class FoodItemService {
 
     try {
       const [result]: any = await this.pool.execute(
-        `UPDATE food_item
-         SET name = ?, info = ?, price = ?, availability = ?, restaurant_id = ?
+        `UPDATE FOOD_ITEM
+         SET food_name = ?,
+             food_info = ?,
+             food_price = ?,
+             food_availability = ?,
+             restaurant_id = ?
          WHERE food_id = ?`,
         [name, info, price, availability, restaurant_id, id],
       );
 
       if (result.affectedRows === 0) {
-        throw new NotFoundException(`Food item with ID ${id} not found`);
+        // Confirm the item doesn't exist; it may simply be unchanged.
+        await this.findOne(id);
       }
 
       return this.findOne(id);
     } catch (error: any) {
-      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+      if (
+        error.code === 'ER_NO_REFERENCED_ROW_2' ||
+        error.errno === 1452
+      ) {
         throw new BadRequestException(
           `Restaurant with ID ${restaurant_id} does not exist`,
         );
       }
+
       throw error;
     }
   }
@@ -96,12 +124,14 @@ export class FoodItemService {
   // DELETE food item
   async remove(id: number): Promise<boolean> {
     const [result]: any = await this.pool.execute(
-      'DELETE FROM food_item WHERE food_id = ?',
+      'DELETE FROM FOOD_ITEM WHERE food_id = ?',
       [id],
     );
 
     if (result.affectedRows === 0) {
-      throw new NotFoundException(`Food item with ID ${id} not found`);
+      throw new NotFoundException(
+        `Food item with ID ${id} not found`,
+      );
     }
 
     return true;
