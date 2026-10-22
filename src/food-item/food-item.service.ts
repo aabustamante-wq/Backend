@@ -1,4 +1,3 @@
-
 import {
   Injectable,
   NotFoundException,
@@ -17,7 +16,7 @@ export class FoodItemService {
   // GET all food items
   async findAll() {
     const [rows]: any = await this.pool.query(
-      'SELECT * FROM FOOD_ITEM',
+      'SELECT * FROM food_item',
     );
 
     return rows;
@@ -30,7 +29,7 @@ export class FoodItemService {
   // GET food item by ID
   async findOne(id: number) {
     const [rows]: any = await this.pool.query(
-      'SELECT * FROM FOOD_ITEM WHERE food_id = ?',
+      'SELECT * FROM food_item WHERE food_id = ?',
       [id],
     );
 
@@ -49,12 +48,21 @@ export class FoodItemService {
 
   // POST create food item
   async create(data: any) {
-    const { name, info, price, availability, restaurant_id } = data;
+    // Safely extract properties to prevent passing `undefined` to SQL queries
+    const name = data.name ?? data.food_name ?? null;
+    const info = data.info ?? data.food_info ?? null;
+    const price = data.price ?? data.food_price ?? null;
+    const availability = data.availability ?? data.food_availability ?? 1;
+    const restaurant_id = data.restaurant_id ?? null;
+
+    if (!restaurant_id) {
+      throw new BadRequestException('restaurant_id is required');
+    }
 
     try {
       const [result]: any = await this.pool.execute(
-        `INSERT INTO FOOD_ITEM
-          (food_name, food_info, food_price, food_availability, restaurant_id)
+        `INSERT INTO food_item
+          (name, info, price, availability, restaurant_id)
          VALUES (?, ?, ?, ?, ?)`,
         [name, info, price, availability, restaurant_id],
       );
@@ -83,22 +91,25 @@ export class FoodItemService {
 
   // PUT update food item
   async update(id: number, data: any) {
-    const { name, info, price, availability, restaurant_id } = data;
+    const name = data.name ?? data.food_name ?? null;
+    const info = data.info ?? data.food_info ?? null;
+    const price = data.price ?? data.food_price ?? null;
+    const availability = data.availability ?? data.food_availability ?? 1;
+    const restaurant_id = data.restaurant_id ?? null;
 
     try {
       const [result]: any = await this.pool.execute(
-        `UPDATE FOOD_ITEM
-         SET food_name = ?,
-             food_info = ?,
-             food_price = ?,
-             food_availability = ?,
+        `UPDATE food_item
+         SET name = ?,
+             info = ?,
+             price = ?,
+             availability = ?,
              restaurant_id = ?
          WHERE food_id = ?`,
         [name, info, price, availability, restaurant_id, id],
       );
 
       if (result.affectedRows === 0) {
-        // Confirm the item doesn't exist; it may simply be unchanged.
         await this.findOne(id);
       }
 
@@ -124,7 +135,7 @@ export class FoodItemService {
   // DELETE food item
   async remove(id: number): Promise<boolean> {
     const [result]: any = await this.pool.execute(
-      'DELETE FROM FOOD_ITEM WHERE food_id = ?',
+      'DELETE FROM food_item WHERE food_id = ?',
       [id],
     );
 
