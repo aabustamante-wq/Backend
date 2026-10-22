@@ -1,10 +1,20 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) {}
 
   // Get all users (protected)
   @UseGuards(JwtAuthGuard)
@@ -16,8 +26,8 @@ export class UsersController {
   // Get single user by id (protected)
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getOne(@Param('id') id: string) {
-    return this.usersService.findById(+id);
+  async getOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.findById(id);
   }
 
   // Create user (open - for demo)
@@ -29,14 +39,17 @@ export class UsersController {
   // Update user (protected)
   @UseGuards(JwtAuthGuard)
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    return this.usersService.updateUser(+id, body);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+  ) {
+    return this.usersService.updateUser(id, body);
   }
 
-  // Delete user (protected)
+  // Delete user (protected) - Returns true in Postman
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.usersService.deleteUser(+id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<boolean> {
+    return this.usersService.deleteUser(id);
   }
 }

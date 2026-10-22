@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -74,14 +74,18 @@ export class UsersService {
     return result;
   }
 
-  // DELETE USER
-  async deleteUser(id: number) {
-    const [result] = await this.pool().execute(
+  // DELETE USER (Returns true on successful deletion)
+  async deleteUser(id: number): Promise<boolean> {
+    const [result]: any = await this.pool().execute(
       `DELETE FROM users WHERE id = ?`,
       [id],
     );
 
-    return result;
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    return true;
   }
 
   // FIND USER BY REFRESH TOKEN

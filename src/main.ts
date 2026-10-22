@@ -1,14 +1,18 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const port = Number(process.env.PORT || 3000);
+  const port = Number(process.env.PORT) || 3000;
 
   await app.listen(port, '0.0.0.0');
 
-  console.log(`Server running on port ${port}`);
+  console.log(`NestJS server is running at http://localhost:${port}`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to start NestJS server:', error);
+  process.exit(1);
+});
