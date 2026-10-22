@@ -1,29 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
 export class CustomerService {
   constructor(private readonly db: DatabaseService) {}
 
-  private pool = () => this.db.getPool();
+  private get pool() {
+    return this.db.getPool();
+  }
 
   // GET all customers
   async findAll() {
-    const [rows] = await this.pool().query(
-      'SELECT * FROM customer'
-    );
-
+    const [rows] = await this.pool.query('SELECT * FROM customer');
     return rows;
   }
 
   // GET customer by ID
   async findOne(id: number) {
-    const [rows] = await this.pool().query(
+    const [rows]: any = await this.pool.query(
       'SELECT * FROM customer WHERE customer_id = ?',
-      [id]
+      [id],
     );
 
-    return rows;
+    if (!rows || rows.length === 0) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    return rows[0];
   }
 
   // POST create customer
@@ -36,7 +39,7 @@ export class CustomerService {
       customer_address,
     } = data;
 
-    const [result] = await this.pool().execute(
+    const [result]: any = await this.pool.execute(
       `INSERT INTO customer
       (
         customer_firstname,
@@ -52,10 +55,13 @@ export class CustomerService {
         customer_email,
         customer_phone,
         customer_address,
-      ]
+      ],
     );
 
-    return result;
+    return {
+      customer_id: result.insertId,
+      ...data,
+    };
   }
 
   // PUT update customer
@@ -68,7 +74,7 @@ export class CustomerService {
       customer_address,
     } = data;
 
-    const [result] = await this.pool().execute(
+    const [result]: any = await this.pool.execute(
       `UPDATE customer
        SET customer_firstname = ?,
            customer_lastname = ?,
@@ -83,19 +89,27 @@ export class CustomerService {
         customer_phone,
         customer_address,
         id,
-      ]
+      ],
     );
 
-    return result;
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    return this.findOne(id);
   }
 
   // DELETE customer
-  async remove(id: number) {
-    const [result] = await this.pool().execute(
+  async remove(id: number): Promise<boolean> {
+    const [result]: any = await this.pool.execute(
       'DELETE FROM customer WHERE customer_id = ?',
-      [id]
+      [id],
     );
 
-    return result;
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
+    return true;
   }
 }

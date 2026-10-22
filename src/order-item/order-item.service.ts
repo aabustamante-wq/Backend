@@ -1,67 +1,109 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 @Injectable()
 export class OrderItemService {
   constructor(private readonly db: DatabaseService) {}
 
+  private get pool() {
+    return this.db.getPool();
+  }
+
+  // GET all order items
   async findAll() {
-    const [rows] = await this.db.getPool().execute<RowDataPacket[]>(
-      'SELECT * FROM ORDER_ITEM',
-    );
+    const [rows] = await this.pool.query('SELECT * FROM ORDER_ITEM');
     return rows;
   }
 
+  // GET order item by ID
   async findOne(id: number) {
-    const [rows] = await this.db.getPool().execute<RowDataPacket[]>(
+    const [rows]: any = await this.pool.query(
       'SELECT * FROM ORDER_ITEM WHERE order_item_id = ?',
       [id],
     );
 
-    if (rows.length === 0) {
-      throw new NotFoundException('Order item not found');
+    if (!rows || rows.length === 0) {
+      throw new NotFoundException(`Order item with ID ${id} not found`);
     }
 
     return rows[0];
   }
 
-  async create(body: any) {
-    const [result] = await this.db.getPool().execute<ResultSetHeader>(
+  // POST create order item
+  async create(data: any) {
+    const {
+      quantity,
+      price,
+      orders_id,
+      food_item_id,
+    } = data;
+
+    const [result]: any = await this.pool.execute(
       `INSERT INTO ORDER_ITEM
-       (quantity, price, orders_id, food_item_id)
-       VALUES (?, ?, ?, ?)`,
-      [body.quantity, body.price, body.orders_id, body.food_item_id],
+      (
+        quantity,
+        price,
+        orders_id,
+        food_item_id
+      )
+      VALUES (?, ?, ?, ?)`,
+      [
+        quantity,
+        price,
+        orders_id,
+        food_item_id,
+      ],
     );
 
     return {
-      message: 'Order item created',
       order_item_id: result.insertId,
+      ...data,
     };
   }
 
-  async update(id: number, body: any) {
-    await this.findOne(id);
+  // PUT update order item
+  async update(id: number, data: any) {
+    const {
+      quantity,
+      price,
+      orders_id,
+      food_item_id,
+    } = data;
 
-    await this.db.getPool().execute<ResultSetHeader>(
+    const [result]: any = await this.pool.execute(
       `UPDATE ORDER_ITEM
-       SET quantity = ?, price = ?, orders_id = ?, food_item_id = ?
+       SET quantity = ?,
+           price = ?,
+           orders_id = ?,
+           food_item_id = ?
        WHERE order_item_id = ?`,
-      [body.quantity, body.price, body.orders_id, body.food_item_id, id],
+      [
+        quantity,
+        price,
+        orders_id,
+        food_item_id,
+        id,
+      ],
     );
 
-    return { message: 'Order item updated' };
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Order item with ID ${id} not found`);
+    }
+
+    return this.findOne(id);
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
-
-    await this.db.getPool().execute<ResultSetHeader>(
+  // DELETE order item
+  async remove(id: number): Promise<boolean> {
+    const [result]: any = await this.pool.execute(
       'DELETE FROM ORDER_ITEM WHERE order_item_id = ?',
       [id],
     );
 
-    return { message: 'Order item deleted' };
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Order item with ID ${id} not found`);
+    }
+
+    return true;
   }
 }

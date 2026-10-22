@@ -1,59 +1,115 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 @Injectable()
 export class PaymentService {
   constructor(private readonly db: DatabaseService) {}
 
+  private get pool() {
+    return this.db.getPool();
+  }
+
+  // GET all payments
   async findAll() {
-    const [rows] = await this.db.getPool().execute(
-      'SELECT * FROM PAYMENT',
-    );
+    const [rows] = await this.pool.query('SELECT * FROM PAYMENT');
     return rows;
   }
 
+  // GET payment by ID
   async findOne(id: number) {
-    const [rows] = await this.db.getPool().execute(
-      'SELECT * FROM PAYMENT WHERE payment_id = ?', [id],
+    const [rows]: any = await this.pool.query(
+      'SELECT * FROM PAYMENT WHERE payment_id = ?',
+      [id],
     );
-    const data = rows as RowDataPacket[];
-    if (!data.length) throw new NotFoundException('Payment not found');
-    return data[0];
+
+    if (!rows || rows.length === 0) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    return rows[0];
   }
 
-  async create(body: any) {
-    const [result] = await this.db.getPool().execute(
+  // POST create payment
+  async create(data: any) {
+    const {
+      payment_method,
+      payment_date,
+      payment_amount,
+      payment_status,
+      orders_id,
+    } = data;
+
+    const [result]: any = await this.pool.execute(
       `INSERT INTO PAYMENT
-       (payment_method, payment_date, payment_amount, payment_status, orders_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [body.payment_method, body.payment_date, body.payment_amount,
-       body.payment_status, body.orders_id],
+      (
+        payment_method,
+        payment_date,
+        payment_amount,
+        payment_status,
+        orders_id
+      )
+      VALUES (?, ?, ?, ?, ?)`,
+      [
+        payment_method,
+        payment_date,
+        payment_amount,
+        payment_status,
+        orders_id,
+      ],
     );
+
     return {
-      message: 'Payment created',
-      payment_id: (result as ResultSetHeader).insertId,
+      payment_id: result.insertId,
+      ...data,
     };
   }
 
-  async update(id: number, body: any) {
-    await this.findOne(id);
-    await this.db.getPool().execute(
-      `UPDATE PAYMENT SET payment_method=?, payment_date=?,
-       payment_amount=?, payment_status=?, orders_id=?
-       WHERE payment_id=?`,
-      [body.payment_method, body.payment_date, body.payment_amount,
-       body.payment_status, body.orders_id, id],
+  // PUT update payment
+  async update(id: number, data: any) {
+    const {
+      payment_method,
+      payment_date,
+      payment_amount,
+      payment_status,
+      orders_id,
+    } = data;
+
+    const [result]: any = await this.pool.execute(
+      `UPDATE PAYMENT
+       SET payment_method = ?,
+           payment_date = ?,
+           payment_amount = ?,
+           payment_status = ?,
+           orders_id = ?
+       WHERE payment_id = ?`,
+      [
+        payment_method,
+        payment_date,
+        payment_amount,
+        payment_status,
+        orders_id,
+        id,
+      ],
     );
-    return { message: 'Payment updated' };
+
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    return this.findOne(id);
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
-    await this.db.getPool().execute(
-      'DELETE FROM PAYMENT WHERE payment_id = ?', [id],
+  // DELETE payment
+  async remove(id: number): Promise<boolean> {
+    const [result]: any = await this.pool.execute(
+      'DELETE FROM PAYMENT WHERE payment_id = ?',
+      [id],
     );
-    return { message: 'Payment deleted' };
+
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    return true;
   }
 }
