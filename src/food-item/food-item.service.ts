@@ -15,6 +15,10 @@ export class FoodItemService {
     return rows;
   }
 
+  async getAll() {
+    return this.findAll();
+  }
+
   // GET food item by ID
   async findOne(id: number) {
     const [rows]: any = await this.pool.query(
@@ -27,6 +31,10 @@ export class FoodItemService {
     }
 
     return rows[0];
+  }
+
+  async findById(id: number) {
+    return this.findOne(id);
   }
 
   // POST create food item
@@ -46,9 +54,60 @@ export class FoodItemService {
       };
     } catch (error: any) {
       if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
-        throw new BadRequestException(`Restaurant with ID ${restaurant_id} does not exist`);
+        throw new BadRequestException(
+          `Restaurant with ID ${restaurant_id} does not exist`,
+        );
       }
       throw error;
     }
+  }
+
+  // PUT update food item
+  async update(id: number, data: any) {
+    const { name, info, price, availability, restaurant_id } = data;
+
+    try {
+      const [result]: any = await this.pool.execute(
+        `UPDATE food_item
+         SET name = ?, info = ?, price = ?, availability = ?, restaurant_id = ?
+         WHERE food_id = ?`,
+        [name, info, price, availability, restaurant_id, id],
+      );
+
+      if (result.affectedRows === 0) {
+        throw new NotFoundException(`Food item with ID ${id} not found`);
+      }
+
+      return this.findOne(id);
+    } catch (error: any) {
+      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+        throw new BadRequestException(
+          `Restaurant with ID ${restaurant_id} does not exist`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async updateFoodItem(id: number, data: any) {
+    return this.update(id, data);
+  }
+
+  // DELETE food item
+  async remove(id: number): Promise<boolean> {
+    const [result]: any = await this.pool.execute(
+      'DELETE FROM food_item WHERE food_id = ?',
+      [id],
+    );
+
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`Food item with ID ${id} not found`);
+    }
+
+    return true;
+  }
+
+  async deleteFoodItem(id: number): Promise<boolean> {
+    return this.remove(id);
   }
 }
