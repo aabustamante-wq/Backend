@@ -1,3 +1,4 @@
+
 import {
   Injectable,
   NotFoundException,
@@ -48,15 +49,27 @@ export class FoodItemService {
 
   // POST create food item
   async create(data: any) {
-    // Safely extract properties to prevent passing `undefined` to SQL queries
-    const name = data.name ?? data.food_name ?? null;
+    const name = data.name ?? data.food_name;
     const info = data.info ?? data.food_info ?? null;
-    const price = data.price ?? data.food_price ?? null;
-    const availability = data.availability ?? data.food_availability ?? 1;
-    const restaurant_id = data.restaurant_id ?? null;
+    const price = data.price ?? data.food_price;
+    const availability =
+      data.availability ?? data.food_availability ?? 1;
+    const restaurant_id = data.restaurant_id;
 
-    if (!restaurant_id) {
-      throw new BadRequestException('restaurant_id is required');
+    if (!name || price === undefined || price === null) {
+      throw new BadRequestException(
+        'Food name and price are required',
+      );
+    }
+
+    if (
+      restaurant_id === undefined ||
+      restaurant_id === null ||
+      restaurant_id === ''
+    ) {
+      throw new BadRequestException(
+        'restaurant_id is required',
+      );
     }
 
     try {
@@ -91,14 +104,34 @@ export class FoodItemService {
 
   // PUT update food item
   async update(id: number, data: any) {
-    const name = data.name ?? data.food_name ?? null;
+    // Confirm that the food item exists
+    await this.findOne(id);
+
+    const name = data.name ?? data.food_name;
     const info = data.info ?? data.food_info ?? null;
-    const price = data.price ?? data.food_price ?? null;
-    const availability = data.availability ?? data.food_availability ?? 1;
-    const restaurant_id = data.restaurant_id ?? null;
+    const price = data.price ?? data.food_price;
+    const availability =
+      data.availability ?? data.food_availability ?? 1;
+    const restaurant_id = data.restaurant_id;
+
+    if (!name || price === undefined || price === null) {
+      throw new BadRequestException(
+        'Food name and price are required',
+      );
+    }
+
+    if (
+      restaurant_id === undefined ||
+      restaurant_id === null ||
+      restaurant_id === ''
+    ) {
+      throw new BadRequestException(
+        'restaurant_id is required',
+      );
+    }
 
     try {
-      const [result]: any = await this.pool.execute(
+      await this.pool.execute(
         `UPDATE food_item
          SET name = ?,
              info = ?,
@@ -106,12 +139,15 @@ export class FoodItemService {
              availability = ?,
              restaurant_id = ?
          WHERE food_id = ?`,
-        [name, info, price, availability, restaurant_id, id],
+        [
+          name,
+          info,
+          price,
+          availability,
+          restaurant_id,
+          id,
+        ],
       );
-
-      if (result.affectedRows === 0) {
-        await this.findOne(id);
-      }
 
       return this.findOne(id);
     } catch (error: any) {
