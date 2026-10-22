@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
@@ -11,14 +11,14 @@ export class OrderItemService {
 
   // GET all order items
   async findAll() {
-    const [rows] = await this.pool.query('SELECT * FROM ORDER_ITEM');
+    const [rows] = await this.pool.query('SELECT * FROM order_item');
     return rows;
   }
 
   // GET order item by ID
   async findOne(id: number) {
     const [rows]: any = await this.pool.query(
-      'SELECT * FROM ORDER_ITEM WHERE order_item_id = ?',
+      'SELECT * FROM order_item WHERE order_item_id = ?',
       [id],
     );
 
@@ -38,27 +38,36 @@ export class OrderItemService {
       food_item_id,
     } = data;
 
-    const [result]: any = await this.pool.execute(
-      `INSERT INTO ORDER_ITEM
-      (
-        quantity,
-        price,
-        orders_id,
-        food_item_id
-      )
-      VALUES (?, ?, ?, ?)`,
-      [
-        quantity,
-        price,
-        orders_id,
-        food_item_id,
-      ],
-    );
+    try {
+      const [result]: any = await this.pool.execute(
+        `INSERT INTO order_item
+        (
+          quantity,
+          price,
+          orders_id,
+          food_item_id
+        )
+        VALUES (?, ?, ?, ?)`,
+        [
+          quantity,
+          price,
+          orders_id,
+          food_item_id,
+        ],
+      );
 
-    return {
-      order_item_id: result.insertId,
-      ...data,
-    };
+      return {
+        order_item_id: result.insertId,
+        ...data,
+      };
+    } catch (error: any) {
+      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+        throw new BadRequestException(
+          `Invalid reference: order ID ${orders_id} or food item ID ${food_item_id} does not exist`,
+        );
+      }
+      throw error;
+    }
   }
 
   // PUT update order item
@@ -70,33 +79,42 @@ export class OrderItemService {
       food_item_id,
     } = data;
 
-    const [result]: any = await this.pool.execute(
-      `UPDATE ORDER_ITEM
-       SET quantity = ?,
-           price = ?,
-           orders_id = ?,
-           food_item_id = ?
-       WHERE order_item_id = ?`,
-      [
-        quantity,
-        price,
-        orders_id,
-        food_item_id,
-        id,
-      ],
-    );
+    try {
+      const [result]: any = await this.pool.execute(
+        `UPDATE order_item
+         SET quantity = ?,
+             price = ?,
+             orders_id = ?,
+             food_item_id = ?
+         WHERE order_item_id = ?`,
+        [
+          quantity,
+          price,
+          orders_id,
+          food_item_id,
+          id,
+        ],
+      );
 
-    if (result.affectedRows === 0) {
-      throw new NotFoundException(`Order item with ID ${id} not found`);
+      if (result.affectedRows === 0) {
+        throw new NotFoundException(`Order item with ID ${id} not found`);
+      }
+
+      return this.findOne(id);
+    } catch (error: any) {
+      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+        throw new BadRequestException(
+          `Invalid reference: order ID ${orders_id} or food item ID ${food_item_id} does not exist`,
+        );
+      }
+      throw error;
     }
-
-    return this.findOne(id);
   }
 
   // DELETE order item
   async remove(id: number): Promise<boolean> {
     const [result]: any = await this.pool.execute(
-      'DELETE FROM ORDER_ITEM WHERE order_item_id = ?',
+      'DELETE FROM order_item WHERE order_item_id = ?',
       [id],
     );
 
