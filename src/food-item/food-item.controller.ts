@@ -1,3 +1,4 @@
+
 import {
   Controller,
   Get,
@@ -12,7 +13,9 @@ import { FoodItemService } from './food-item.service';
 
 @Controller('food-item')
 export class FoodItemController {
-  constructor(private readonly foodItemService: FoodItemService) {}
+  constructor(
+    private readonly foodItemService: FoodItemService,
+  ) {}
 
   @Get()
   findAll() {
@@ -30,7 +33,10 @@ export class FoodItemController {
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
     return this.foodItemService.update(id, data);
   }
 

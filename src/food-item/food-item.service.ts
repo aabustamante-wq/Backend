@@ -14,161 +14,175 @@ export class FoodItemService {
     return this.db.getPool();
   }
 
-  // GET all food items
+  // GET: All food items
   async findAll() {
     const [rows]: any = await this.pool.query(
       'SELECT * FROM food_item',
     );
-
     return rows;
   }
 
-  async getAll() {
-    return this.findAll();
-  }
-
-  // GET food item by ID
+  // GET: Food item by ID
   async findOne(id: number) {
-    const [rows]: any = await this.pool.query(
+    const [rows]: any = await this.pool.execute(
       'SELECT * FROM food_item WHERE food_id = ?',
       [id],
     );
 
-    if (!rows || rows.length === 0) {
+    if (rows.length === 0) {
       throw new NotFoundException(
-        `Food item with ID ${id} not found`,
+        `Food item ${id} not found`,
       );
     }
 
     return rows[0];
   }
 
-  async findById(id: number) {
-    return this.findOne(id);
-  }
-
-  // POST create food item
+  // POST: Create food item
   async create(data: any) {
-    const name = data.name ?? data.food_name;
-    const info = data.info ?? data.food_info ?? null;
-    const price = data.price ?? data.food_price;
-    const availability =
-      data.availability ?? data.food_availability ?? 1;
-    const restaurant_id = data.restaurant_id;
+    const {
+      food_name,
+      food_info,
+      food_price,
+      food_availability = 'Available',
+      restaurant_id,
+    } = data;
 
-    if (!name || price === undefined || price === null) {
+    if (
+      !food_name ||
+      !food_info ||
+      food_price === undefined ||
+      food_price === null ||
+      food_price === ''
+    ) {
       throw new BadRequestException(
-        'Food name and price are required',
+        'Food name, information, and price are required',
+      );
+    }
+
+    const price = Number(food_price);
+    const restaurantId = Number(restaurant_id);
+
+    if (!Number.isFinite(price) || price < 0) {
+      throw new BadRequestException(
+        'Food price must be a non-negative number',
       );
     }
 
     if (
       restaurant_id === undefined ||
       restaurant_id === null ||
-      restaurant_id === ''
+      restaurant_id === '' ||
+      !Number.isInteger(restaurantId) ||
+      restaurantId <= 0
     ) {
       throw new BadRequestException(
-        'restaurant_id is required',
+        'A valid restaurant_id is required',
       );
     }
 
     try {
       const [result]: any = await this.pool.execute(
         `INSERT INTO food_item
-          (name, info, price, availability, restaurant_id)
+          (food_name, food_info, food_price,
+           food_availability, restaurant_id)
          VALUES (?, ?, ?, ?, ?)`,
-        [name, info, price, availability, restaurant_id],
+        [
+          food_name,
+          food_info,
+          price,
+          food_availability,
+          restaurantId,
+        ],
       );
 
-      return {
-        food_id: result.insertId,
-        name,
-        info,
-        price,
-        availability,
-        restaurant_id,
-      };
+      return this.findOne(result.insertId);
     } catch (error: any) {
-      if (
-        error.code === 'ER_NO_REFERENCED_ROW_2' ||
-        error.errno === 1452
-      ) {
+      if (error.errno === 1452) {
         throw new BadRequestException(
-          `Restaurant with ID ${restaurant_id} does not exist`,
+          `Restaurant ${restaurantId} does not exist`,
         );
       }
-
       throw error;
     }
   }
 
-  // PUT update food item
+  // PUT: Update food item
   async update(id: number, data: any) {
-    // Confirm that the food item exists
     await this.findOne(id);
 
-    const name = data.name ?? data.food_name;
-    const info = data.info ?? data.food_info ?? null;
-    const price = data.price ?? data.food_price;
-    const availability =
-      data.availability ?? data.food_availability ?? 1;
-    const restaurant_id = data.restaurant_id;
+    const {
+      food_name,
+      food_info,
+      food_price,
+      food_availability = 'Available',
+      restaurant_id,
+    } = data;
 
-    if (!name || price === undefined || price === null) {
+    if (
+      !food_name ||
+      !food_info ||
+      food_price === undefined ||
+      food_price === null ||
+      food_price === ''
+    ) {
       throw new BadRequestException(
-        'Food name and price are required',
+        'Food name, information, and price are required',
+      );
+    }
+
+    const price = Number(food_price);
+    const restaurantId = Number(restaurant_id);
+
+    if (!Number.isFinite(price) || price < 0) {
+      throw new BadRequestException(
+        'Food price must be a non-negative number',
       );
     }
 
     if (
       restaurant_id === undefined ||
       restaurant_id === null ||
-      restaurant_id === ''
+      restaurant_id === '' ||
+      !Number.isInteger(restaurantId) ||
+      restaurantId <= 0
     ) {
       throw new BadRequestException(
-        'restaurant_id is required',
+        'A valid restaurant_id is required',
       );
     }
 
     try {
       await this.pool.execute(
         `UPDATE food_item
-         SET name = ?,
-             info = ?,
-             price = ?,
-             availability = ?,
+         SET food_name = ?,
+             food_info = ?,
+             food_price = ?,
+             food_availability = ?,
              restaurant_id = ?
          WHERE food_id = ?`,
         [
-          name,
-          info,
+          food_name,
+          food_info,
           price,
-          availability,
-          restaurant_id,
+          food_availability,
+          restaurantId,
           id,
         ],
       );
 
       return this.findOne(id);
     } catch (error: any) {
-      if (
-        error.code === 'ER_NO_REFERENCED_ROW_2' ||
-        error.errno === 1452
-      ) {
+      if (error.errno === 1452) {
         throw new BadRequestException(
-          `Restaurant with ID ${restaurant_id} does not exist`,
+          `Restaurant ${restaurantId} does not exist`,
         );
       }
-
       throw error;
     }
   }
 
-  async updateFoodItem(id: number, data: any) {
-    return this.update(id, data);
-  }
-
-  // DELETE food item
+  // DELETE: Return true if successfully deleted
   async remove(id: number): Promise<boolean> {
     const [result]: any = await this.pool.execute(
       'DELETE FROM food_item WHERE food_id = ?',
@@ -177,14 +191,10 @@ export class FoodItemService {
 
     if (result.affectedRows === 0) {
       throw new NotFoundException(
-        `Food item with ID ${id} not found`,
+        `Food item ${id} not found`,
       );
     }
 
     return true;
-  }
-
-  async deleteFoodItem(id: number): Promise<boolean> {
-    return this.remove(id);
   }
 }
