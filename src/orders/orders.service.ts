@@ -153,7 +153,13 @@ export class OrderItemService {
       error.errno === 1452
     ) {
       throw new BadRequestException(
-        `Referenced orders_id (${ordersId}) or food_id (${foodId}) does not exist in the database`,
+        `Referenced orders_id (${ordersId}) or food_id (${foodId}) does not exist in database`,
+      );
+    }
+
+    if (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146) {
+      throw new InternalServerErrorException(
+        'Table ORDER_ITEM does not exist in database. Check table name casing.',
       );
     }
 
