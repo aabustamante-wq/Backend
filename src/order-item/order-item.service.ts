@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
@@ -11,7 +15,7 @@ export class OrderItemService {
 
   // GET all order items
   async findAll() {
-    const [rows] = await this.pool.query('SELECT * FROM order_item');
+    const [rows]: any = await this.pool.query('SELECT * FROM order_item');
     return rows;
   }
 
@@ -31,39 +35,45 @@ export class OrderItemService {
 
   // POST create order item
   async create(data: any) {
-    const {
-      quantity,
-      price,
-      orders_id,
-      food_item_id,
-    } = data;
+    // Support both schema-defined keys and alternative request payload keys
+    const orders_id = data.orders_id ?? data.order_id ?? null;
+    const food_id = data.food_id ?? data.food_item_id ?? null;
+    const order_quantity = data.order_quantity ?? data.quantity ?? 1;
+    const order_unit_price = data.order_unit_price ?? data.price ?? 0;
+    const order_subtotal =
+      data.order_subtotal ??
+      data.subtotal ??
+      order_quantity * order_unit_price;
 
     try {
       const [result]: any = await this.pool.execute(
         `INSERT INTO order_item
-        (
-          quantity,
-          price,
-          orders_id,
-          food_item_id
-        )
-        VALUES (?, ?, ?, ?)`,
+          (order_quantity, order_unit_price, order_subtotal, orders_id, food_id)
+         VALUES (?, ?, ?, ?, ?)`,
         [
-          quantity,
-          price,
+          order_quantity,
+          order_unit_price,
+          order_subtotal,
           orders_id,
-          food_item_id,
+          food_id,
         ],
       );
 
       return {
         order_item_id: result.insertId,
-        ...data,
+        order_quantity,
+        order_unit_price,
+        order_subtotal,
+        orders_id,
+        food_id,
       };
     } catch (error: any) {
-      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+      if (
+        error.code === 'ER_NO_REFERENCED_ROW_2' ||
+        error.errno === 1452
+      ) {
         throw new BadRequestException(
-          `Invalid reference: order ID ${orders_id} or food item ID ${food_item_id} does not exist`,
+          `Invalid reference: orders_id (${orders_id}) or food_id (${food_id}) does not exist in the database`,
         );
       }
       throw error;
@@ -72,26 +82,32 @@ export class OrderItemService {
 
   // PUT update order item
   async update(id: number, data: any) {
-    const {
-      quantity,
-      price,
-      orders_id,
-      food_item_id,
-    } = data;
+    const orders_id = data.orders_id ?? data.order_id ?? null;
+    const food_id = data.food_id ?? data.food_item_id ?? null;
+    const order_quantity = data.order_quantity ?? data.quantity ?? null;
+    const order_unit_price = data.order_unit_price ?? data.price ?? null;
+    const order_subtotal =
+      data.order_subtotal ??
+      data.subtotal ??
+      (order_quantity && order_unit_price
+        ? order_quantity * order_unit_price
+        : null);
 
     try {
       const [result]: any = await this.pool.execute(
         `UPDATE order_item
-         SET quantity = ?,
-             price = ?,
-             orders_id = ?,
-             food_item_id = ?
+         SET order_quantity = COALESCE(?, order_quantity),
+             order_unit_price = COALESCE(?, order_unit_price),
+             order_subtotal = COALESCE(?, order_subtotal),
+             orders_id = COALESCE(?, orders_id),
+             food_id = COALESCE(?, food_id)
          WHERE order_item_id = ?`,
         [
-          quantity,
-          price,
+          order_quantity,
+          order_unit_price,
+          order_subtotal,
           orders_id,
-          food_item_id,
+          food_id,
           id,
         ],
       );
@@ -102,9 +118,12 @@ export class OrderItemService {
 
       return this.findOne(id);
     } catch (error: any) {
-      if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+      if (
+        error.code === 'ER_NO_REFERENCED_ROW_2' ||
+        error.errno === 1452
+      ) {
         throw new BadRequestException(
-          `Invalid reference: order ID ${orders_id} or food item ID ${food_item_id} does not exist`,
+          `Invalid reference: orders_id (${orders_id}) or food_id (${food_id}) does not exist in the database`,
         );
       }
       throw error;
