@@ -14,7 +14,7 @@ export class OrdersService {
     return this.db.getPool();
   }
 
-  // GET all orders
+  // GET: All orders
   async findAll() {
     const [rows]: any = await this.pool.query(
       'SELECT * FROM orders ORDER BY orders_id DESC',
@@ -26,7 +26,7 @@ export class OrdersService {
     return this.findAll();
   }
 
-  // GET order by ID
+  // GET: Order by ID
   async findOne(id: number | string) {
     const numericId = Number(id);
     if (!Number.isInteger(numericId) || numericId <= 0) {
@@ -49,9 +49,9 @@ export class OrdersService {
     return this.findOne(id);
   }
 
-  // POST create order
+  // POST: Create order
   async create(data: any) {
-    // Tinatanggap pareho ang order_date / orders_date, total_amount / orders_total_amount
+    // Fallback support for both singular and plural key names from incoming payloads
     const orders_date =
       data.orders_date ??
       data.order_date ??
@@ -99,7 +99,7 @@ export class OrdersService {
     }
   }
 
-  // PUT update order
+  // PUT: Update order
   async update(id: number | string, data: any) {
     const numericId = Number(id);
     await this.findOne(numericId);
@@ -142,7 +142,7 @@ export class OrdersService {
     return this.update(id, data);
   }
 
-  // DELETE order
+  // DELETE: Remove order
   async remove(id: number | string): Promise<boolean> {
     const numericId = Number(id);
     const [result]: any = await this.pool.execute(
@@ -161,7 +161,7 @@ export class OrdersService {
     return this.remove(id);
   }
 
-  // Centralized Error Handler para sa MySQL Exceptions
+  // Centralized Error Handler for MySQL Exceptions
   private handleDatabaseError(error: any, customerId?: any, restaurantId?: any) {
     if (
       error.code === 'ER_NO_REFERENCED_ROW_2' ||
@@ -169,7 +169,7 @@ export class OrdersService {
       error.errno === 1452
     ) {
       throw new BadRequestException(
-        `Referenced customer_id (${customerId}) or restaurant_id (${restaurantId}) does not exist in database`,
+        `Referenced customer_id (${customerId}) or restaurant_id (${restaurantId}) does not exist in the database`,
       );
     }
 
