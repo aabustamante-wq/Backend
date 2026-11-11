@@ -7,17 +7,17 @@ import {
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
-export class OrdersService {
+export class OrderItemService {
   constructor(private readonly db: DatabaseService) {}
 
   private get pool() {
     return this.db.getPool();
   }
 
-  // GET: All orders
+  // GET all order items
   async findAll() {
     const [rows]: any = await this.pool.query(
-      'SELECT * FROM orders ORDER BY orders_id DESC',
+      'SELECT * FROM ORDER_ITEM ORDER BY order_item_id DESC',
     );
     return rows;
   }
@@ -26,20 +26,20 @@ export class OrdersService {
     return this.findAll();
   }
 
-  // GET: Order by ID
+  // GET order item by ID
   async findOne(id: number | string) {
     const numericId = Number(id);
     if (!Number.isInteger(numericId) || numericId <= 0) {
-      throw new BadRequestException('Invalid order ID');
+      throw new BadRequestException('Invalid order item ID');
     }
 
     const [rows]: any = await this.pool.execute(
-      'SELECT * FROM orders WHERE orders_id = ?',
+      'SELECT * FROM ORDER_ITEM WHERE order_item_id = ?',
       [numericId],
     );
 
     if (!rows || rows.length === 0) {
-      throw new NotFoundException(`Order with ID ${numericId} not found`);
+      throw new NotFoundException(`Order item with ID ${numericId} not found`);
     }
 
     return rows[0];
@@ -49,133 +49,117 @@ export class OrdersService {
     return this.findOne(id);
   }
 
-  // POST: Create order
+  // POST create order item
   async create(data: any) {
-    // Fallback support for both singular and plural key names from incoming payloads
-    const orders_date =
-      data.orders_date ??
-      data.order_date ??
-      new Date().toISOString().slice(0, 10);
+    const orders_id = data.orders_id ? Number(data.orders_id) : null;
+    const food_id = data.food_id ? Number(data.food_id) : null;
+    const order_quantity = Number(data.order_quantity ?? 1);
+    const order_unit_price = Number(data.order_unit_price ?? 0);
 
-    const orders_total_amount = Number(
-      data.orders_total_amount ?? data.total_amount ?? 0,
-    );
+    const order_subtotal =
+      data.order_subtotal !== undefined
+        ? Number(data.order_subtotal)
+        : order_quantity * order_unit_price;
 
-    const orders_status =
-      data.orders_status ?? data.order_status ?? 'Pending';
-
-    const customer_id = data.customer_id ? Number(data.customer_id) : null;
-    const restaurant_id = data.restaurant_id ? Number(data.restaurant_id) : null;
-
-    if (!customer_id || !restaurant_id) {
+    if (!orders_id || !food_id) {
       throw new BadRequestException(
-        'Both customer_id and restaurant_id are required and cannot be null',
+        'Both orders_id and food_id are required and cannot be null',
       );
     }
 
-    if (isNaN(orders_total_amount) || orders_total_amount < 0) {
-      throw new BadRequestException(
-        'orders_total_amount must be a non-negative number',
-      );
+    if (isNaN(order_quantity) || order_quantity <= 0) {
+      throw new BadRequestException('order_quantity must be a positive integer');
     }
 
     try {
       const [result]: any = await this.pool.execute(
-        `INSERT INTO orders
-          (orders_date, orders_status, orders_total_amount, customer_id, restaurant_id)
+        `INSERT INTO ORDER_ITEM
+          (order_quantity, order_unit_price, order_subtotal, orders_id, food_id)
          VALUES (?, ?, ?, ?, ?)`,
         [
-          orders_date,
-          orders_status,
-          orders_total_amount,
-          customer_id,
-          restaurant_id,
+          order_quantity,
+          order_unit_price,
+          order_subtotal,
+          orders_id,
+          food_id,
         ],
       );
 
       return this.findOne(result.insertId);
     } catch (error: any) {
-      this.handleDatabaseError(error, customer_id, restaurant_id);
+      this.handleDatabaseError(error, orders_id, food_id);
     }
   }
 
-  // PUT: Update order
+  // PUT update order item
   async update(id: number | string, data: any) {
     const numericId = Number(id);
     await this.findOne(numericId);
 
-    const orders_date = data.orders_date ?? data.order_date ?? null;
-    const orders_total_amount =
-      data.orders_total_amount !== undefined || data.total_amount !== undefined
-        ? Number(data.orders_total_amount ?? data.total_amount)
-        : null;
-    const orders_status = data.orders_status ?? data.order_status ?? null;
-    const customer_id = data.customer_id ? Number(data.customer_id) : null;
-    const restaurant_id = data.restaurant_id ? Number(data.restaurant_id) : null;
+    const orders_id = data.orders_id ? Number(data.orders_id) : null;
+    const food_id = data.food_id ? Number(data.food_id) : null;
+    const order_quantity =
+      data.order_quantity !== undefined ? Number(data.order_quantity) : null;
+    const order_unit_price =
+      data.order_unit_price !== undefined ? Number(data.order_unit_price) : null;
+    const order_subtotal =
+      data.order_subtotal !== undefined ? Number(data.order_subtotal) : null;
 
     try {
       await this.pool.execute(
-        `UPDATE orders
-         SET orders_date = COALESCE(?, orders_date),
-             orders_status = COALESCE(?, orders_status),
-             orders_total_amount = COALESCE(?, orders_total_amount),
-             customer_id = COALESCE(?, customer_id),
-             restaurant_id = COALESCE(?, restaurant_id)
-         WHERE orders_id = ?`,
+        `UPDATE ORDER_ITEM
+         SET order_quantity = COALESCE(?, order_quantity),
+             order_unit_price = COALESCE(?, order_unit_price),
+             order_subtotal = COALESCE(?, order_subtotal),
+             orders_id = COALESCE(?, orders_id),
+             food_id = COALESCE(?, food_id)
+         WHERE order_item_id = ?`,
         [
-          orders_date,
-          orders_status,
-          orders_total_amount,
-          customer_id,
-          restaurant_id,
+          order_quantity,
+          order_unit_price,
+          order_subtotal,
+          orders_id,
+          food_id,
           numericId,
         ],
       );
 
       return this.findOne(numericId);
     } catch (error: any) {
-      this.handleDatabaseError(error, customer_id, restaurant_id);
+      this.handleDatabaseError(error, orders_id, food_id);
     }
   }
 
-  async updateOrder(id: number | string, data: any) {
-    return this.update(id, data);
-  }
-
-  // DELETE: Remove order
+  // DELETE order item
   async remove(id: number | string): Promise<boolean> {
     const numericId = Number(id);
     const [result]: any = await this.pool.execute(
-      'DELETE FROM orders WHERE orders_id = ?',
+      'DELETE FROM ORDER_ITEM WHERE order_item_id = ?',
       [numericId],
     );
 
     if (result.affectedRows === 0) {
-      throw new NotFoundException(`Order with ID ${numericId} not found`);
+      throw new NotFoundException(`Order item with ID ${numericId} not found`);
     }
 
     return true;
   }
 
-  async deleteOrder(id: number | string): Promise<boolean> {
-    return this.remove(id);
-  }
-
   // Centralized Error Handler for MySQL Exceptions
-  private handleDatabaseError(error: any, customerId?: any, restaurantId?: any) {
+  private handleDatabaseError(error: any, ordersId?: any, foodId?: any) {
     if (
       error.code === 'ER_NO_REFERENCED_ROW_2' ||
       error.code === 'ER_NO_REFERENCED_ROW' ||
       error.errno === 1452
     ) {
       throw new BadRequestException(
-        `Referenced customer_id (${customerId}) or restaurant_id (${restaurantId}) does not exist in the database`,
+        `Referenced orders_id (${ordersId}) or food_id (${foodId}) does not exist in the database`,
       );
     }
 
     if (error.code === 'ER_BAD_NULL_ERROR' || error.errno === 1048) {
       throw new BadRequestException(
-        'Missing required fields. customer_id and restaurant_id cannot be null.',
+        'Missing required fields. orders_id and food_id cannot be null.',
       );
     }
 
