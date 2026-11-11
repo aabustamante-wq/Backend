@@ -43,28 +43,37 @@ export class OrdersService {
 
   // POST create order
   async create(data: any) {
-    // Convert undefined values to null or defaults to satisfy mysql2 driver requirements
-    const order_date =
+    // Accepts both singular and plural JSON payload properties
+    const orders_date =
+      data.orders_date ??
       data.order_date ??
       new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const total_amount = data.total_amount ?? 0;
-    const order_status = data.order_status ?? 'Pending';
+    const orders_total_amount =
+      data.orders_total_amount ?? data.total_amount ?? 0;
+    const orders_status =
+      data.orders_status ?? data.order_status ?? 'Pending';
     const customer_id = data.customer_id ?? null;
     const restaurant_id = data.restaurant_id ?? null;
 
     try {
       const [result]: any = await this.pool.execute(
         `INSERT INTO orders
-          (order_date, total_amount, order_status, customer_id, restaurant_id)
+          (orders_date, orders_total_amount, orders_status, customer_id, restaurant_id)
          VALUES (?, ?, ?, ?, ?)`,
-        [order_date, total_amount, order_status, customer_id, restaurant_id],
+        [
+          orders_date,
+          orders_total_amount,
+          orders_status,
+          customer_id,
+          restaurant_id,
+        ],
       );
 
       return {
         orders_id: result.insertId,
-        order_date,
-        total_amount,
-        order_status,
+        orders_date,
+        orders_total_amount,
+        orders_status,
         customer_id,
         restaurant_id,
       };
@@ -83,22 +92,30 @@ export class OrdersService {
 
   // PUT update order
   async update(id: number, data: any) {
-    const order_date = data.order_date ?? null;
-    const total_amount = data.total_amount ?? null;
-    const order_status = data.order_status ?? null;
+    const orders_date = data.orders_date ?? data.order_date ?? null;
+    const orders_total_amount =
+      data.orders_total_amount ?? data.total_amount ?? null;
+    const orders_status = data.orders_status ?? data.order_status ?? null;
     const customer_id = data.customer_id ?? null;
     const restaurant_id = data.restaurant_id ?? null;
 
     try {
       const [result]: any = await this.pool.execute(
         `UPDATE orders
-         SET order_date = COALESCE(?, order_date),
-             total_amount = COALESCE(?, total_amount),
-             order_status = COALESCE(?, order_status),
+         SET orders_date = COALESCE(?, orders_date),
+             orders_total_amount = COALESCE(?, orders_total_amount),
+             orders_status = COALESCE(?, orders_status),
              customer_id = COALESCE(?, customer_id),
              restaurant_id = COALESCE(?, restaurant_id)
          WHERE orders_id = ?`,
-        [order_date, total_amount, order_status, customer_id, restaurant_id, id],
+        [
+          orders_date,
+          orders_total_amount,
+          orders_status,
+          customer_id,
+          restaurant_id,
+          id,
+        ],
       );
 
       if (result.affectedRows === 0) {
